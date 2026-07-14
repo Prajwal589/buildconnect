@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axiosInstance from '@/services/api/axiosInstance';
 import Button from '@/components/ui/Button';
@@ -34,6 +34,23 @@ const KNOWN_SKILLS = [
 const CreateProjectPage = () => {
   const router = useRouter();
   
+  // Master Skills from DB
+  const [skillsList, setSkillsList] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        const res = (await axiosInstance.get('/master/skills')) as any;
+        if (res.success && Array.isArray(res.data)) {
+          setSkillsList(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch master skills:', err);
+      }
+    };
+    fetchSkills();
+  }, []);
+
   // Wizard Step State
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [saving, setSaving] = useState(false);
@@ -360,7 +377,7 @@ const CreateProjectPage = () => {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-slate-300">Required Skills</label>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    {KNOWN_SKILLS.map((skill) => {
+                    {skillsList.map((skill) => {
                       const selected = pkg.skills.includes(skill.id);
                       return (
                         <button
