@@ -105,6 +105,61 @@ class AdminRepository {
         const result = await (0, db_1.query)(sql);
         return result.rows;
     }
+    // Get builder projects awaiting admin review and approval
+    static async getPendingProjectApprovals() {
+        const result = await (0, db_1.query)(`SELECT p.id,
+              p.name,
+              p.description,
+              p.budget,
+              p.location,
+              p.property_type,
+              p.timeline_start,
+              p.timeline_end,
+              p.status,
+              p.created_at,
+              p.updated_at,
+              b.company_name as builder_name,
+              b.trust_score as builder_trust_score,
+              COUNT(pp.id) as package_count
+       FROM projects p
+       JOIN builders b ON p.builder_id = b.id
+       LEFT JOIN project_packages pp ON pp.project_id = p.id
+       WHERE p.status = 'pending_approval'
+       GROUP BY p.id, b.company_name, b.trust_score
+       ORDER BY p.created_at ASC`);
+        return result.rows;
+    }
+    // Review pending project and publish or reject it
+    static async reviewProject(projectId, action, remarks) {
+        const status = action === 'approve' ? 'published' : 'draft';
+        await (0, db_1.query)('BEGIN');
+        try {
+            await (0, db_1.query)(`UPDATE projects
+         SET status = $1,
+             updated_at = NOW()
+         WHERE id = $2`, [status, projectId]);
+            const result = await (0, db_1.query)(`SELECT p.id,
+                p.name,
+                p.description,
+                p.budget,
+                p.location,
+                p.property_type,
+                p.timeline_start,
+                p.timeline_end,
+                p.status,
+                b.company_name as builder_name,
+                b.trust_score as builder_trust_score
+         FROM projects p
+         JOIN builders b ON p.builder_id = b.id
+         WHERE p.id = $1 LIMIT 1`, [projectId]);
+            await (0, db_1.query)('COMMIT');
+            return { ...result.rows[0], action, remarks };
+        }
+        catch (error) {
+            await (0, db_1.query)('ROLLBACK');
+            throw error;
+        }
+    }
     // Get all posted ratings and reviews
     static async getAllReviews() {
         const sql = `

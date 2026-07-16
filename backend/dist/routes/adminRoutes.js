@@ -11,6 +11,9 @@ router.use((0, rbacMiddleware_1.requireRoles)(['admin']));
 // Verification checkups
 router.get('/verifications', adminController_1.AdminController.getPendingList);
 router.post('/verifications/:id/review', adminController_1.AdminController.reviewProfile);
+// Project approval queue
+router.get('/projects/pending', adminController_1.AdminController.getPendingProjects);
+router.post('/projects/:id/review', adminController_1.AdminController.reviewProject);
 // User Moderation
 router.get('/users', adminController_1.AdminController.getUsersList);
 router.post('/users/:id/suspend', adminController_1.AdminController.setUserSuspension);

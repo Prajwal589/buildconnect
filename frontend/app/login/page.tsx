@@ -15,16 +15,24 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const getRoleRedirectPath = (role: string | undefined) => {
+    if (role === 'builder') {
+      const redirectPath = typeof window !== 'undefined' ? localStorage.getItem('builderRedirectAfterLogin') : null;
+      if (redirectPath && redirectPath.startsWith('/builder/')) {
+        localStorage.removeItem('builderRedirectAfterLogin');
+        return redirectPath;
+      }
+      return '/builder/dashboard';
+    }
+    if (role === 'contractor') return '/contractor/dashboard';
+    if (role === 'admin') return '/admin/dashboard';
+    return '/login';
+  };
+
   // Redirect if already authenticated
   useEffect(() => {
     if (user) {
-      if (user.role === 'builder') {
-        router.push('/builder/dashboard');
-      } else if (user.role === 'contractor') {
-        router.push('/contractor/dashboard');
-      } else if (user.role === 'admin') {
-        router.push('/admin/dashboard');
-      }
+      router.push(getRoleRedirectPath(user.role));
     }
   }, [user, router]);
 
@@ -42,13 +50,7 @@ const LoginPage = () => {
       const response = await loginUser(email, password);
       if (response.success && response.data?.user) {
         const loggedInUser = response.data.user;
-        if (loggedInUser.role === 'builder') {
-          router.push('/builder/dashboard');
-        } else if (loggedInUser.role === 'contractor') {
-          router.push('/contractor/dashboard');
-        } else if (loggedInUser.role === 'admin') {
-          router.push('/admin/dashboard');
-        }
+        router.push(getRoleRedirectPath(loggedInUser.role));
       }
     } catch (err: any) {
       // Handled by AuthContext error state

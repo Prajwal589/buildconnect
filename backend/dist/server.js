@@ -30,7 +30,8 @@ app.use((0, cors_1.default)({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express_1.default.json());
+app.use(express_1.default.json({ limit: '8mb' }));
+app.use(express_1.default.urlencoded({ extended: true, limit: '8mb' }));
 // Serve local upload assets statically for testing fallbacks
 app.use('/storage/uploads', express_1.default.static(path_1.default.join(__dirname, 'storage/uploads')));
 // Main API Routes

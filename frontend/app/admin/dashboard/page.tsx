@@ -40,6 +40,17 @@ interface PlatformUserItem {
   created_at: string;
 }
 
+interface PendingProjectItem {
+  id: string;
+  name: string;
+  location: string;
+  budget: string;
+  package_count: string;
+  builder_name: string;
+  builder_trust_score: number | null;
+  created_at: string;
+}
+
 interface PlatformReviewItem {
   id: string;
   project_id: string;
@@ -68,10 +79,11 @@ interface PlatformStats {
 
 const AdminDashboard = () => {
   // Tabs State
-  const [activeTab, setActiveTab] = useState<'overview' | 'verifications' | 'users' | 'reviews'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'verifications' | 'projects' | 'users' | 'reviews'>('overview');
 
   // Diagnostics & Verifications Data States
   const [pendingReviews, setPendingReviews] = useState<PendingVerificationItem[]>([]);
+  const [pendingProjects, setPendingProjects] = useState<PendingProjectItem[]>([]);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [usersList, setUsersList] = useState<PlatformUserItem[]>([]);
   const [reviewsList, setReviewsList] = useState<PlatformReviewItem[]>([]);
@@ -116,6 +128,19 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchPendingProjects = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = (await axiosInstance.get('/admin/projects/pending')) as any;
+      if (res.success) setPendingProjects(res.data);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch pending projects.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchReviews = async () => {
     try {
       setLoading(true);
@@ -136,6 +161,8 @@ const AdminDashboard = () => {
       fetchUsers();
     } else if (activeTab === 'reviews') {
       fetchReviews();
+    } else if (activeTab === 'projects') {
+      fetchPendingProjects();
     }
   }, [activeTab]);
 
@@ -266,6 +293,7 @@ const AdminDashboard = () => {
         {[
           { id: 'overview', label: 'Platform Diagnostics' },
           { id: 'verifications', label: `Pending Reviews (${pendingReviews.length})` },
+          { id: 'projects', label: `Project Approvals (${pendingProjects.length})` },
           { id: 'users', label: 'Platform Users' },
           { id: 'reviews', label: 'Moderate Reviews' }
         ].map(tab => (
@@ -376,6 +404,99 @@ const AdminDashboard = () => {
                   <div className="p-5 pt-0 border-t border-slate-800/40 mt-4 flex items-center justify-between gap-4">
                     <span className="text-xs text-slate-500 font-semibold">{item.documents.length} document files uploaded</span>
                     <Button onClick={() => setSelectedItem(item)} variant="primary" size="sm">Review Details</Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB CONTENTS: 3. pending project approvals */}
+      {activeTab === 'projects' && (
+        <div className="flex flex-col gap-4">
+          {pendingProjects.length === 0 ? (
+            <Card className="py-12 border-dashed border-slate-800">
+              <CardContent className="flex flex-col items-center gap-3 text-slate-500 text-center">
+                <svg className="w-8 h-8 text-slate-650" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <h3 className="text-base font-bold text-white mt-1">No Pending Projects</h3>
+                <p className="text-xs max-w-sm mt-1 leading-relaxed">There are currently no builder projects awaiting administrative approval.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              {pendingProjects.map((project) => (
+                <Card key={project.id} hoverEffect className="flex flex-col justify-between">
+                  <div>
+                    <CardHeader className="pb-3 flex flex-row justify-between items-start">
+                      <div>
+                        <CardTitle className="text-base font-bold text-white block truncate">{project.name}</CardTitle>
+                        <p className="text-xs text-slate-400 mt-1">{project.location}</p>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-semibold">{new Date(project.created_at).toLocaleDateString()}</span>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-4 text-slate-400 text-xs">
+                      <div className="space-y-2 bg-slate-950/40 border border-slate-900 rounded-2xl p-4">
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Builder</span>
+                          <p className="text-slate-200 text-sm font-semibold truncate">{project.builder_name}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Packages</span>
+                          <p className="text-slate-200 text-sm font-semibold">{project.package_count}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-2 bg-slate-950/40 border border-slate-900 rounded-2xl p-4">
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Budget</span>
+                          <p className="text-slate-200 text-sm font-semibold">₹{Number(project.budget).toLocaleString('en-IN')}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Builder Trust</span>
+                          <p className="text-slate-200 text-sm font-semibold">{project.builder_trust_score ?? 'N/A'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </div>
+                  <div className="p-5 pt-0 border-t border-slate-800/40 mt-4 flex flex-wrap justify-end gap-3">
+                    <Button
+                      onClick={async () => {
+                        if (!window.confirm('Approve and publish this project?')) return;
+                        try {
+                          const res = (await axiosInstance.post(`/admin/projects/${project.id}/review`, { action: 'approve' })) as any;
+                          if (res.success) {
+                            alert('Project approved and published.');
+                            fetchPendingProjects();
+                          }
+                        } catch (err: any) {
+                          alert(err?.message || 'Failed to approve project.');
+                        }
+                      }}
+                      variant="primary"
+                      size="sm"
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        if (!window.confirm('Reject this project and return it to draft?')) return;
+                        try {
+                          const res = (await axiosInstance.post(`/admin/projects/${project.id}/review`, { action: 'reject' })) as any;
+                          if (res.success) {
+                            alert('Project rejected and moved back to draft.');
+                            fetchPendingProjects();
+                          }
+                        } catch (err: any) {
+                          alert(err?.message || 'Failed to reject project.');
+                        }
+                      }}
+                      variant="danger"
+                      size="sm"
+                    >
+                      Reject
+                    </Button>
                   </div>
                 </Card>
               ))}

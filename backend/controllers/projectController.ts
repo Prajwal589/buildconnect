@@ -19,13 +19,13 @@ export class ProjectController {
       }
 
       const validatedData = createProjectSchema.parse(req.body);
-      const { packages, ...projectDetails } = validatedData;
+      const { packages, site_images, ...projectDetails } = validatedData;
 
-      // Project status validation: defaults to draft or pending approval
       const createdProject = await ProjectRepository.createProject(
         builderId,
         projectDetails as any,
-        packages as any[]
+        packages as any[],
+        site_images as any[]
       );
 
       res.status(201).json(
@@ -66,9 +66,9 @@ export class ProjectController {
         return;
       }
 
-      // Security Check: If project is in 'draft' status, restrict access to the builder owner only
-      if (project.status === 'draft' && project.builder_id !== userId) {
-        res.status(403).json(createApiResponse(false, 'Access denied. Draft project visibility is private.'));
+      // Security Check: If project is in 'draft' or 'pending_approval', restrict access to the builder owner or admins only
+      if (['draft', 'pending_approval'].includes(project.status) && project.builder_id !== userId && req.user?.role !== 'admin') {
+        res.status(403).json(createApiResponse(false, 'Access denied. Project visibility is restricted until it is published.'));
         return;
       }
 

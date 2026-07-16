@@ -41,6 +41,32 @@ class AdminController {
             next(error);
         }
     }
+    // Get all builder projects awaiting admin approval
+    static async getPendingProjects(_req, res, next) {
+        try {
+            const pendingProjects = await adminRepository_1.AdminRepository.getPendingProjectApprovals();
+            res.status(200).json((0, apiResponse_1.createApiResponse)(true, 'Pending projects retrieved successfully.', pendingProjects));
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    // Approve or reject a project submission
+    static async reviewProject(req, res, next) {
+        try {
+            const projectId = req.params.id;
+            const validatedData = adminValidator_1.reviewProjectSchema.parse(req.body);
+            const { action, remarks } = validatedData;
+            const result = await adminRepository_1.AdminRepository.reviewProject(projectId, action, remarks);
+            const message = action === 'approve'
+                ? 'Project has been approved and published successfully.'
+                : 'Project has been rejected and reverted to draft state.';
+            res.status(200).json((0, apiResponse_1.createApiResponse)(true, message, result));
+        }
+        catch (error) {
+            next(error);
+        }
+    }
     // Get all posted reviews list
     static async getReviewsList(_req, res, next) {
         try {

@@ -12,6 +12,15 @@ const BuilderLayout = ({ children }: { children: React.ReactNode }) => {
   const { user, loading, logoutUser } = useAuth();
   
   const [profileData, setProfileData] = useState<any>(null);
+  const inactivityTimestampKey = 'builderInactivityTimestamp';
+  const redirectAfterLoginKey = 'builderRedirectAfterLogin';
+  const inactivityLimitMs = 5 * 60 * 1000;
+
+  const markBuilderActivity = () => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(inactivityTimestampKey, String(Date.now()));
+    }
+  };
 
   // 1. Session Redirect Guard
   useEffect(() => {
@@ -21,6 +30,35 @@ const BuilderLayout = ({ children }: { children: React.ReactNode }) => {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'builder') return;
+
+    markBuilderActivity();
+
+    const handleActivity = () => markBuilderActivity();
+    const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart', 'touchmove'];
+
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, handleActivity, { passive: true });
+    });
+
+    const inactivityTimer = window.setInterval(() => {
+      const lastActivity = Number(window.localStorage.getItem(inactivityTimestampKey) || Date.now());
+      if (Date.now() - lastActivity > inactivityLimitMs) {
+        window.localStorage.setItem(redirectAfterLoginKey, pathname);
+        logoutUser();
+        router.push('/login');
+      }
+    }, 20000);
+
+    return () => {
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, handleActivity);
+      });
+      window.clearInterval(inactivityTimer);
+    };
+  }, [user, pathname, router, logoutUser]);
 
   // 2. Fetch Builder Specific Profile Info (for Trust Score and Company Name)
   useEffect(() => {

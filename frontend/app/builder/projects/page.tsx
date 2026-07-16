@@ -45,8 +45,8 @@ const BuilderProjectsPage = () => {
 
   const handlePublishProject = async (projectId: string) => {
     try {
-      // Transition status to published (or pending_approval for admin check)
-      const res = (await axiosInstance.patch(`/projects/${projectId}/status`, { status: 'published' })) as any;
+      // Builder-created projects should enter the approval flow and remain pending until admin approval.
+      const res = (await axiosInstance.patch(`/projects/${projectId}/status`, { status: 'pending_approval' })) as any;
       if (res.success) {
         fetchProjects(); // Reload list
       }
@@ -167,7 +167,7 @@ const BuilderProjectsPage = () => {
                       size="sm"
                       className="border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10"
                     >
-                      Publish
+                      Submit for Approval
                     </Button>
                   )}
                   <Button

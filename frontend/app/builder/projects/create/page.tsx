@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axiosInstance from '@/services/api/axiosInstance';
 import Button from '@/components/ui/Button';
@@ -16,8 +16,35 @@ interface PackageFormState {
   timeline_end: string;
   scope: string;
   required_experience: string;
-  skills: string[]; // Mock skill selections for V1
+  custom_services: string;
+  selected_services: string[];
+  skills: string[];
 }
+
+const EXPERIENCE_OPTIONS = ['Fresher', '1+ Years', '2+ Years', '3+ Years', '5+ Years', '7+ Years', '10+ Years'];
+
+const WORK_PACKAGE_OPTIONS = [
+  { name: 'Site Preparation & Clearing', services: ['Site Clearing','Vegetation Removal','Debris Removal','Existing Structure Removal','Site Levelling','Topsoil Removal','Temporary Access Preparation','Construction Site Setup'] },
+  { name: 'Excavation & Earthwork', services: ['Foundation Excavation','Bulk Earth Excavation','Trench Excavation','Soil Removal','Backfilling','Soil Compaction','Earth Levelling','Excavated Material Disposal'] },
+  { name: 'Foundation Works', services: ['Isolated Footing Construction','Combined Footing Construction','Strip Footing Construction','Raft Foundation Construction','Pile Foundation Works','Pile Cap Construction','Foundation Concrete Works','Foundation Reinforcement Works'] },
+  { name: 'RCC Structural Works', services: ['Reinforcement Steel Fixing','Formwork & Shuttering','Concrete Pouring','Column Construction','Beam Construction','Slab Construction','Staircase RCC Works','RCC Structural Finishing'] },
+  { name: 'Masonry & Blockwork', services: ['Brick Masonry','Concrete Blockwork','AAC Blockwork','Internal Partition Walls','External Wall Construction','Parapet Wall Construction','Masonry Opening Works','Masonry Repair & Finishing'] },
+  { name: 'Structural Steel Works', services: ['Structural Steel Fabrication','Steel Column Installation','Steel Beam Installation','Steel Truss Construction','On-Site Steel Erection','Steel Connection Works','Structural Steel Welding','Steel Surface Protection'] },
+  { name: 'Waterproofing Works', services: ['Terrace Waterproofing','Bathroom Waterproofing','Basement Waterproofing','Water Tank Waterproofing','External Wall Waterproofing','Roof Waterproofing','Expansion Joint Waterproofing','Waterproofing Testing'] },
+  { name: 'Electrical Works', services: ['Electrical Wiring','Distribution Panel Installation','Switch & Socket Installation','Lighting Installation','Earthing System Installation','Lightning Protection','Cable Tray Installation','Electrical Testing & Commissioning'] },
+  { name: 'Plumbing Works', services: ['Water Supply Piping','Sanitary Piping','Bathroom Plumbing','Water Tank Connection','Plumbing Fixture Installation','Drainage Pipe Installation','Pump Connection Works','Plumbing Testing & Commissioning'] },
+  { name: 'HVAC Works', services: ['Air Conditioning Installation','HVAC Ducting','Ventilation System Installation','Chilled Water Piping','Refrigerant Piping','HVAC Equipment Installation','Air Distribution System Installation','HVAC Testing & Commissioning'] },
+  { name: 'Fire & Safety Works', services: ['Fire Sprinkler Installation','Fire Hydrant Installation','Fire Alarm System Installation','Smoke Detector Installation','Fire Pump Installation','Fire Hose Reel Installation','Emergency Safety System Installation','Fire System Testing & Commissioning'] },
+  { name: 'Flooring & Tiling Works', services: ['Ceramic Tile Installation','Vitrified Tile Installation','Marble Flooring','Granite Flooring','Industrial Flooring','Bathroom Tiling','Wall Tiling','Flooring Finishing & Polishing'] },
+  { name: 'Painting Works', services: ['Interior Wall Painting','Exterior Wall Painting','Wall Putty Application','Primer Application','Ceiling Painting','Metal Surface Painting','Protective Coating','Final Paint Finishing'] },
+  { name: 'False Ceiling Works', services: ['Gypsum False Ceiling','POP Ceiling Works','Grid Ceiling Installation','Acoustic Ceiling Installation','Decorative Ceiling Works','Ceiling Framework Installation','Ceiling Panel Installation','False Ceiling Finishing'] },
+  { name: 'Carpentry & Woodwork', services: ['Door Frame Installation','Wooden Door Installation','Cabinet & Storage Works','Modular Woodwork','Custom Furniture Works','Wooden Partition Works','Wooden Wall Panelling','Wood Finishing & Polishing'] },
+  { name: 'Glass, Aluminium & Façade Works', services: ['Aluminium Window Installation','Aluminium Door Installation','Glass Door Installation','Curtain Wall Installation','ACP Cladding','Structural Glazing','Glass Partition Installation','Façade Finishing Works'] },
+  { name: 'Interior Fit-Out Works', services: ['Office Fit-Out','Residential Interior Execution','Partition Installation','Wall Panelling','Interior Finishing Works','Interior Fixture Installation','Decorative Works','Final Interior Completion Works'] },
+  { name: 'Road & Paving Works', services: ['Internal Road Construction','Asphalt Paving','Concrete Road Construction','Interlocking Paver Installation','Kerb Stone Installation','Walkway Construction','Parking Area Paving','Road Finishing Works'] },
+  { name: 'Landscaping Works', services: ['Lawn Development','Tree & Plant Installation','Irrigation System Installation','Hardscape Works','Garden Development','Soil Preparation for Landscaping','Landscape Lighting Preparation','Garden Maintenance Setup'] },
+  { name: 'CCTV, Security & ELV Works', services: ['CCTV Camera Installation','Access Control Installation','Intercom System Installation','Structured Network Cabling','Public Address System Installation','Video Door Phone Installation','Security Alarm System Installation','ELV Testing & Commissioning'] }
+];
 
 // Popular construction skills for selection
 const KNOWN_SKILLS = [
@@ -34,22 +61,35 @@ const KNOWN_SKILLS = [
 const CreateProjectPage = () => {
   const router = useRouter();
   
-  // Master Skills from DB
-  const [skillsList, setSkillsList] = useState<{ id: string; name: string }[]>([]);
+  const [siteImages, setSiteImages] = useState<Array<{ name: string; fileType: string; fileData: string }>>([]);
+  const skillsList = KNOWN_SKILLS;
 
-  useEffect(() => {
-    const fetchSkills = async () => {
-      try {
-        const res = (await axiosInstance.get('/master/skills')) as any;
-        if (res.success && Array.isArray(res.data)) {
-          setSkillsList(res.data);
-        }
-      } catch (err) {
-        console.error('Failed to fetch master skills:', err);
-      }
-    };
-    fetchSkills();
-  }, []);
+  const handleImageFiles = async (files: FileList | null) => {
+    if (!files) return;
+    const filePromises = Array.from(files).map((file) => {
+      return new Promise<{ name: string; fileType: string; fileData: string }>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve({
+            name: file.name,
+            fileType: file.type || 'image/jpeg',
+            fileData: result
+          });
+        };
+        reader.onerror = () => reject(new Error('Failed to read image file.'));
+        reader.readAsDataURL(file);
+      });
+    });
+
+    try {
+      const uploadedImages = await Promise.all(filePromises);
+      setSiteImages((prev) => [...prev, ...uploadedImages]);
+    } catch (err) {
+      console.error('Image upload failed', err);
+      setErrorMsg('Unable to process selected images. Please try again.');
+    }
+  };
 
   // Wizard Step State
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -60,6 +100,19 @@ const CreateProjectPage = () => {
   const [projectName, setProjectName] = useState('');
   const [projectDesc, setProjectDesc] = useState('');
   const [projectBudget, setProjectBudget] = useState('');
+  const formatBudgetInput = (value: string) => {
+    const normalized = value.replace(/,/g, '').replace(/[^\d.]/g, '');
+    if (!normalized) return '';
+    const [whole, fraction] = normalized.split('.');
+    const parsedWhole = whole.replace(/^0+(?=\d)/, '') || '0';
+    const formattedWhole = parsedWhole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return fraction !== undefined ? `${formattedWhole}.${fraction}` : formattedWhole;
+  };
+
+  const parseBudgetValue = (value: string) => {
+    const numeric = Number(value.replace(/,/g, '').replace(/[^\d.]/g, ''));
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
   const [timelineStart, setTimelineStart] = useState('');
   const [timelineEnd, setTimelineEnd] = useState('');
   const [propertyType, setPropertyType] = useState('Commercial');
@@ -75,6 +128,8 @@ const CreateProjectPage = () => {
       timeline_end: '',
       scope: '',
       required_experience: '3+ Years',
+      custom_services: '',
+      selected_services: [],
       skills: []
     }
   ]);
@@ -90,7 +145,9 @@ const CreateProjectPage = () => {
         timeline_end: '',
         scope: '',
         required_experience: '3+ Years',
-        skills: []
+        custom_services: '',
+        skills: [],
+        selected_services: []
       }
     ]);
   };
@@ -106,6 +163,24 @@ const CreateProjectPage = () => {
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
+  };
+
+  const handlePackageSelection = (packageIndex: number, selectedPackageName: string) => {
+    const selectedPackage = WORK_PACKAGE_OPTIONS.find((option) => option.name === selectedPackageName);
+    updatePackageField(packageIndex, 'name', selectedPackageName);
+    updatePackageField(packageIndex, 'selected_services', []);
+    if (selectedPackage) {
+      updatePackageField(packageIndex, 'description', selectedPackageName);
+    }
+  };
+
+  const handleServiceToggle = (packageIndex: number, serviceName: string) => {
+    const pkg = packages[packageIndex];
+    const selectedServices = pkg.selected_services.includes(serviceName)
+      ? pkg.selected_services.filter((service) => service !== serviceName)
+      : [...pkg.selected_services, serviceName];
+
+    updatePackageField(packageIndex, 'selected_services', selectedServices);
   };
 
   const handleSkillToggle = (packageIndex: number, skillId: string) => {
@@ -129,8 +204,8 @@ const CreateProjectPage = () => {
   const validateStep2 = () => {
     for (let i = 0; i < packages.length; i++) {
       const pkg = packages[i];
-      if (!pkg.name || pkg.budget <= 0 || !pkg.scope) {
-        setErrorMsg(`Please fill in all required fields for Package #${i + 1}.`);
+      if (!pkg.name || pkg.budget <= 0 || (pkg.selected_services.length === 0 && !pkg.custom_services.trim())) {
+        setErrorMsg(`Please select a work package and provide at least one service or custom service for Package #${i + 1}.`);
         return false;
       }
     }
@@ -159,18 +234,29 @@ const CreateProjectPage = () => {
     const payload = {
       name: projectName,
       description: projectDesc,
-      budget: parseFloat(projectBudget),
+      budget: parseBudgetValue(projectBudget),
       timeline_start: timelineStart || undefined,
       timeline_end: timelineEnd || undefined,
       property_type: propertyType,
       location,
       status: submitStatus,
-      packages: packages.map(pkg => ({
-        ...pkg,
-        description: pkg.description || pkg.scope || pkg.name,
-        // Send skills array (or omit if backend table not seeded)
-        skills: pkg.skills.length > 0 ? pkg.skills : undefined
-      }))
+      site_images: siteImages.length > 0 ? siteImages : undefined,
+      packages: packages.map(pkg => {
+        const scopeText = [
+          pkg.scope?.trim(),
+          pkg.selected_services.length > 0 ? `Selected services: ${pkg.selected_services.join(', ')}` : '',
+          pkg.custom_services.trim() ? `Custom services: ${pkg.custom_services.trim()}` : ''
+        ].filter(Boolean).join('\n\n');
+        return {
+          ...pkg,
+          budget: Number(pkg.budget) || 0,
+          description: pkg.description || pkg.scope || pkg.name,
+          scope: scopeText || pkg.name,
+          selected_services: pkg.selected_services,
+          custom_services: pkg.custom_services,
+          skills: pkg.skills
+        };
+      })
     };
 
     try {
@@ -179,7 +265,8 @@ const CreateProjectPage = () => {
         router.push('/builder/projects');
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to submit project framework.');
+      const validationMessage = err?.errors?.[0]?.message || err?.message || 'Failed to submit project framework.';
+      setErrorMsg(validationMessage);
     } finally {
       setSaving(false);
     }
@@ -258,10 +345,11 @@ const CreateProjectPage = () => {
               />
               <Input
                 label="Declared Budget (INR)"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 placeholder="E.g. 5000000"
                 value={projectBudget}
-                onChange={(e) => setProjectBudget(e.target.value)}
+                onChange={(e) => setProjectBudget(formatBudgetInput(e.target.value))}
               />
             </div>
 
@@ -292,6 +380,32 @@ const CreateProjectPage = () => {
                   <option value="Infrastructure">Infrastructure Road/Bridge</option>
                 </select>
               </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              <label className="text-sm font-medium text-slate-300">Project Site Images (Optional)</label>
+              <input
+                type="file"
+                accept="image/png,image/jpeg"
+                multiple
+                onChange={(e) => handleImageFiles(e.target.files)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 outline-none"
+              />
+              {siteImages.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {siteImages.map((image, idx) => (
+                    <div key={idx} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3 text-slate-300 text-xs flex items-center justify-between gap-3">
+                      <span className="truncate">{image.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSiteImages((prev) => prev.filter((_, index) => index !== idx))}
+                        className="text-rose-400 hover:text-rose-200"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Button onClick={handleNextStep} variant="primary" className="self-end mt-4">
@@ -326,53 +440,88 @@ const CreateProjectPage = () => {
 
               <CardContent className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Package Name"
-                    type="text"
-                    placeholder="E.g. Foundation Masonry & Concrete"
-                    value={pkg.name}
-                    onChange={(e) => updatePackageField(idx, 'name', e.target.value)}
-                  />
-                  <Input
-                    label="Allocated Budget (INR)"
-                    type="number"
-                    placeholder="E.g. 1500000"
-                    value={pkg.budget || ''}
-                    onChange={(e) => updatePackageField(idx, 'budget', parseFloat(e.target.value) || 0)}
-                  />
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-300">Work Package</label>
+                    <select
+                      value={pkg.name}
+                      onChange={(e) => handlePackageSelection(idx, e.target.value)}
+                      className="w-full bg-slate-900/60 border border-slate-800 focus:border-purple-500/80 focus:ring-purple-500/30 focus:ring-4 rounded-xl px-4 py-3 text-sm text-slate-300 outline-none transition-all duration-300"
+                    >
+                      <option value="">Select a predefined work package</option>
+                      {WORK_PACKAGE_OPTIONS.map((option) => (
+                        <option key={option.name} value={option.name}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-300">Package Budget</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="E.g. 1500000"
+                      value={pkg.budget ? pkg.budget.toLocaleString('en-IN') : ''}
+                      onChange={(e) => updatePackageField(idx, 'budget', parseBudgetValue(e.target.value))}
+                      className="w-full bg-white border border-brand-border rounded-xl px-4 py-3 text-sm text-brand-slate placeholder-brand-slate-light/50 outline-none transition-all duration-300 focus:border-brand-orange focus:ring-brand-orange/20 focus:ring-4"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input
-                    label="Start Date"
-                    type="date"
-                    value={pkg.timeline_start}
-                    onChange={(e) => updatePackageField(idx, 'timeline_start', e.target.value)}
-                  />
-                  <Input
-                    label="End Date"
-                    type="date"
-                    value={pkg.timeline_end}
-                    onChange={(e) => updatePackageField(idx, 'timeline_end', e.target.value)}
-                  />
-                  <Input
-                    label="Required Experience"
-                    type="text"
-                    placeholder="E.g. 5+ Years"
-                    value={pkg.required_experience}
-                    onChange={(e) => updatePackageField(idx, 'required_experience', e.target.value)}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-300">Required Experience</label>
+                    <select
+                      value={pkg.required_experience}
+                      onChange={(e) => updatePackageField(idx, 'required_experience', e.target.value)}
+                      className="w-full bg-slate-900/60 border border-slate-800 focus:border-purple-500/80 focus:ring-purple-500/30 focus:ring-4 rounded-xl px-4 py-3 text-sm text-slate-300 outline-none transition-all duration-300"
+                    >
+                      {EXPERIENCE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-300">Package Scope Overview</label>
+                    <input
+                      type="text"
+                      value={pkg.scope}
+                      onChange={(e) => updatePackageField(idx, 'scope', e.target.value)}
+                      placeholder="Describe the package scope..."
+                      className="w-full bg-slate-900/60 border border-slate-800 focus:border-purple-500/80 focus:ring-purple-500/30 focus:ring-4 rounded-xl px-4 py-3 text-sm text-slate-300 outline-none transition-all duration-300"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-slate-300">Scope Statement / Scope of Work</label>
+                  <label className="text-sm font-medium text-slate-300">Custom Services / Special Instructions</label>
                   <textarea
-                    value={pkg.scope}
-                    onChange={(e) => updatePackageField(idx, 'scope', e.target.value)}
-                    placeholder="Detail the materials to be used, specifications, and performance expectations..."
-                    className="w-full h-24 bg-slate-900/60 border border-slate-800 focus:border-purple-500/80 focus:ring-purple-500/30 focus:ring-4 rounded-xl p-4 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-300"
+                    value={pkg.custom_services}
+                    onChange={(e) => updatePackageField(idx, 'custom_services', e.target.value)}
+                    placeholder="Add any custom services or special instructions for this package"
+                    className="w-full min-h-[96px] bg-slate-900/60 border border-slate-800 focus:border-purple-500/80 focus:ring-purple-500/30 focus:ring-4 rounded-xl px-4 py-3 text-sm text-slate-300 placeholder-slate-500 outline-none transition-all duration-300"
                   />
                 </div>
+
+                {pkg.name && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-slate-300">Select Package Services</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {(WORK_PACKAGE_OPTIONS.find((option) => option.name === pkg.name)?.services || []).map((serviceName) => {
+                        const selected = pkg.selected_services.includes(serviceName);
+                        return (
+                          <label key={serviceName} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-all ${selected ? 'border-purple-500/40 bg-purple-500/10 text-purple-200' : 'border-slate-800 bg-slate-900/40 text-slate-400'}`}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => handleServiceToggle(idx, serviceName)}
+                              className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-purple-500 focus:ring-purple-500"
+                            />
+                            <span>{serviceName}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-slate-300">Required Skills</label>
@@ -442,7 +591,7 @@ const CreateProjectPage = () => {
               </div>
               <div>
                 <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block">Budget Limit</span>
-                <span className="text-white font-bold text-base">₹{Number(projectBudget).toLocaleString('en-IN')}</span>
+                <span className="text-white font-bold text-base">₹{parseBudgetValue(projectBudget).toLocaleString('en-IN')}</span>
               </div>
               <div>
                 <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block">Location</span>
@@ -462,7 +611,10 @@ const CreateProjectPage = () => {
                   <div key={idx} className="p-4 bg-slate-950/40 border border-slate-900 rounded-xl flex justify-between items-center gap-4">
                     <div>
                       <h4 className="font-bold text-sm text-slate-200">{pkg.name}</h4>
-                      <p className="text-xs text-slate-500 mt-1 max-w-[400px] truncate">{pkg.scope}</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-[400px] truncate">{pkg.scope || (pkg.selected_services.length > 0 ? `Services: ${pkg.selected_services.join(', ')}` : 'No services selected')}</p>
+                      {pkg.selected_services.length > 0 && (
+                        <p className="text-[10px] text-slate-400 mt-1">Selected services: {pkg.selected_services.join(', ')}</p>
+                      )}
                     </div>
                     <div className="text-right flex-shrink-0">
                       <span className="font-bold text-slate-100 text-sm block">₹{pkg.budget.toLocaleString('en-IN')}</span>
@@ -488,12 +640,12 @@ const CreateProjectPage = () => {
                   Save Draft
                 </Button>
                 <Button
-                  onClick={() => handleSubmit('published')}
+                  onClick={() => handleSubmit('pending_approval')}
                   variant="primary"
                   loading={saving}
                   className="flex-1 sm:flex-none"
                 >
-                  Publish Project
+                  Submit for Approval
                 </Button>
               </div>
             </div>

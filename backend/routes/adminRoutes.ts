@@ -13,6 +13,10 @@ router.use(requireRoles(['admin']));
 router.get('/verifications', AdminController.getPendingList);
 router.post('/verifications/:id/review', AdminController.reviewProfile);
 
+// Project approvals
+router.get('/projects/pending', AdminController.getPendingProjects);
+router.post('/projects/:id/review', AdminController.reviewProjectApproval);
+
 // User Moderation
 router.get('/users', AdminController.getUsersList);
 router.post('/users/:id/suspend', AdminController.setUserSuspension);

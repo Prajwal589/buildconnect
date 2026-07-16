@@ -8,6 +8,7 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 
 import { BarChart } from '@/components/ui/Charts';
+import { calculateBuilderProfileCompletion } from '@/utils/builderProfile';
 
 interface AnalyticsData {
   totalProjects: number;
@@ -25,18 +26,24 @@ const BuilderDashboard = () => {
   const [projectChartData, setProjectChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profileCompletion, setProfileCompletion] = useState({ overall: 0, sections: [] as Array<{ key:string; label:string; percent:number; detail:string }> });
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
-        const [res, projRes] = await Promise.all([
+        const [res, projRes, profileRes] = await Promise.all([
           axiosInstance.get('/builders/analytics') as any,
-          axiosInstance.get('/projects/list/builder') as any
+          axiosInstance.get('/projects/list/builder') as any,
+          axiosInstance.get('/builders/profile') as any
         ]);
 
         if (res.success) {
           setData(res.data);
+        }
+
+        if (profileRes.success && profileRes.data) {
+          setProfileCompletion(calculateBuilderProfileCompletion(profileRes.data));
         }
 
         if (projRes.success && projRes.data) {
@@ -138,6 +145,22 @@ const BuilderDashboard = () => {
           </Button>
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Profile Completion</CardTitle>
+          <CardDescription>Your Builder profile progress updates automatically as you fill it in.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-3xl font-bold text-white">{profileCompletion.overall}%</span>
+            <Badge variant="primary" size="sm">Live</Badge>
+          </div>
+          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all" style={{ width: `${profileCompletion.overall}%` }} />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* METRIC CARD GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

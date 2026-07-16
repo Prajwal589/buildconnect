@@ -162,6 +162,8 @@ export class BuilderController {
       const validatedData = uploadFileSchema.parse(req.body);
       const { fileName, fileType, fileData } = validatedData;
 
+      const MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024;
+
       // Extract base64 file buffer (handle data URL prefix if present)
       let base64String = fileData;
       if (fileData.includes('base64,')) {
@@ -169,6 +171,13 @@ export class BuilderController {
       }
 
       const fileBuffer = Buffer.from(base64String, 'base64');
+
+      if (fileBuffer.length > MAX_DOCUMENT_SIZE_BYTES) {
+        res.status(413).json(
+          createApiResponse(false, 'File exceeds the 5 MB limit per document.')
+        );
+        return;
+      }
       
       // Upload to storage
       const fileUrl = await StorageService.uploadFile(fileBuffer, fileName, 'builder-docs');

@@ -19,6 +19,20 @@ interface PackageItem {
   required_experience: string | null;
   skills: string[] | null;
   status: 'open' | 'awarded' | 'completed' | 'cancelled';
+  quotations?: QuotationItem[];
+  selected_contractor?: string | null;
+}
+
+interface QuotationItem {
+  id: string;
+  proposed_budget: string;
+  proposed_timeline_start: string | null;
+  proposed_timeline_end: string | null;
+  proposal_notes: string | null;
+  status: string;
+  contractor_name?: string;
+  contractor_trust_score?: string;
+  contractor_success_rate?: string;
 }
 
 interface ProjectDetail {
@@ -56,9 +70,49 @@ const ProjectDetailsPage = () => {
   const fetchProjectDetails = async () => {
     try {
       setLoading(true);
-      const res = (await axiosInstance.get(`/projects/${projectId}`)) as any;
-      if (res.success) {
-        setProject(res.data);
+      const [projectRes, applicationsRes] = await Promise.all([
+        axiosInstance.get(`/projects/${projectId}`) as any,
+        axiosInstance.get('/builders/applications') as any
+      ]);
+
+      if (projectRes.success) {
+        const projectData = projectRes.data;
+        if (applicationsRes.success && Array.isArray(applicationsRes.data)) {
+          const packageQuotations: Record<string, QuotationItem[]> = {};
+          const packageSelectedContractors: Record<string, string | null> = {};
+
+          applicationsRes.data.forEach((item: any) => {
+            const packageId = item.package_id;
+            const quotationEntry: QuotationItem = {
+              id: item.quotation_id,
+              proposed_budget: item.proposed_budget,
+              proposed_timeline_start: item.proposed_timeline_start,
+              proposed_timeline_end: item.proposed_timeline_end,
+              proposal_notes: item.proposal_notes,
+              status: item.quotation_status,
+              contractor_name: item.contractor_name,
+              contractor_trust_score: item.contractor_trust_score,
+              contractor_success_rate: item.contractor_success_rate,
+            };
+
+            if (!packageQuotations[packageId]) {
+              packageQuotations[packageId] = [];
+            }
+            packageQuotations[packageId].push(quotationEntry);
+
+            if (item.quotation_status === 'accepted' && !packageSelectedContractors[packageId]) {
+              packageSelectedContractors[packageId] = item.contractor_name || 'Selected contractor';
+            }
+          });
+
+          projectData.packages = (projectData.packages || []).map((pkg: PackageItem) => ({
+            ...pkg,
+            quotations: packageQuotations[pkg.id] || [],
+            selected_contractor: packageSelectedContractors[pkg.id] || null
+          }));
+        }
+
+        setProject(projectData);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to load project details.');
@@ -153,6 +207,8 @@ const ProjectDetailsPage = () => {
     cancelled: 'danger'
   } as const;
 
+  const projectBiddingStatus = project.packages?.some((pkg) => pkg.status === 'open') ? 'Active' : 'Closed';
+
   return (
     <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto">
       {/* HEADER */}
@@ -227,6 +283,43 @@ const ProjectDetailsPage = () => {
                       </div>
                       
                       <p className="text-xs text-slate-400">{pkg.description}</p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500">Bid Status</div>
+                          <div className="mt-1 text-sm font-semibold text-slate-200 capitalize">{pkg.status === 'awarded' ? 'Closed' : pkg.status === 'completed' ? 'Completed' : 'Open'}</div>
+                        </div>
+                        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500">Selected Contractor</div>
+                          <div className="mt-1 text-sm font-semibold text-slate-200">{pkg.selected_contractor || 'Not finalized yet'}</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3 mt-2">
+                        <div className="text-[10px] uppercase tracking-wider text-slate-500">Contractor Quotations</div>
+                        {pkg.quotations && pkg.quotations.length > 0 ? (
+                          <div className="mt-2 flex flex-col gap-2">
+                            {pkg.quotations.map((quotation) => (
+                              <div key={quotation.id} className="rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div>
+                                    <div className="text-sm font-semibold text-slate-200">{quotation.contractor_name || 'Contractor'}</div>
+                                    <div className="text-[10px] text-slate-500">Budget: ₹{Number(quotation.proposed_budget).toLocaleString('en-IN')}</div>
+                                  </div>
+                                  <Badge variant="glass" size="sm" className="capitalize border-slate-700 text-slate-300">
+                                    {quotation.status}
+                                  </Badge>
+                                </div>
+                                {quotation.proposal_notes && (
+                                  <div className="mt-2 text-[11px] text-slate-400">{quotation.proposal_notes}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-[11px] text-slate-500">No quotations received yet for this package.</div>
+                        )}
+                      </div>
                       
                       <div className="text-xs text-slate-300 mt-1">
                         <span className="font-semibold block text-slate-400 text-[10px] uppercase tracking-wider">Scope of Work</span>
@@ -275,6 +368,10 @@ const ProjectDetailsPage = () => {
                 <span className="text-slate-200">
                   {project.timeline_start ? new Date(project.timeline_start).toLocaleDateString() : 'N/A'} - {project.timeline_end ? new Date(project.timeline_end).toLocaleDateString() : 'N/A'}
                 </span>
+              </div>
+              <div className="flex justify-between items-center py-2.5 border-b border-slate-800/40">
+                <span className="text-slate-500 font-medium">Overall Bidding</span>
+                <span className="text-slate-200">{projectBiddingStatus}</span>
               </div>
             </CardContent>
           </Card>

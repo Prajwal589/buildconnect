@@ -6,6 +6,7 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Badge from '@/components/ui/Badge';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
+import { calculateBuilderProfileCompletion } from '@/utils/builderProfile';
 
 interface VerificationDoc {
   name: string;
@@ -21,6 +22,7 @@ const BuilderProfilePage = () => {
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null); // Track which file is uploading
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [profileCompletion, setProfileCompletion] = useState<{ overall: number; sections: Array<{ key:string; label:string; percent:number; detail:string }> }>({ overall: 0, sections: [] });
 
   // Profile forms
   const [companyName, setCompanyName] = useState('');
@@ -59,6 +61,19 @@ const BuilderProfilePage = () => {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    setProfileCompletion(calculateBuilderProfileCompletion(profile, {
+      companyName,
+      address,
+      website,
+      logoUrl,
+      companyRegNo,
+      gstNo,
+      panNo,
+      uploadedDocs
+    }));
+  }, [profile, companyName, address, website, logoUrl, companyRegNo, gstNo, panNo, uploadedDocs]);
 
   // Update company profile details
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -102,6 +117,13 @@ const BuilderProfilePage = () => {
     setErrorMsg(null);
     setSuccessMsg(null);
     setUploadingDoc(docLabel);
+
+    const MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024;
+    if (file.size > MAX_DOCUMENT_SIZE_BYTES) {
+      setErrorMsg(`${docLabel} exceeds the 5 MB limit per document.`);
+      setUploadingDoc(null);
+      return;
+    }
 
     try {
       const base64Data = await fileToBase64(file);
@@ -251,6 +273,39 @@ const BuilderProfilePage = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Completion</CardTitle>
+              <CardDescription>Track how complete your Builder profile is across key sections.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-3xl font-bold text-white">{profileCompletion.overall}%</div>
+                  <div className="text-xs text-slate-400">Overall profile progress</div>
+                </div>
+                <div className="flex-1 h-3 rounded-full bg-slate-800 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all" style={{ width: `${profileCompletion.overall}%` }} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {profileCompletion.sections.map((section) => (
+                  <div key={section.key} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-200">{section.label}</span>
+                      <span className="text-sm font-bold text-purple-300">{section.percent}%</span>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-slate-800 overflow-hidden">
+                      <div className="h-full rounded-full bg-purple-500/80" style={{ width: `${section.percent}%` }} />
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">{section.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
         {/* EDIT PROFILE FORM */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           <Card>
@@ -376,7 +431,10 @@ const BuilderProfilePage = () => {
                 const isUploaded = uploadedDocs.some(d => d.name.startsWith(docLabel));
                 return (
                   <div key={docLabel} className="flex flex-col gap-2 p-5 border border-dashed border-slate-800 hover:border-slate-700 bg-slate-950/40 rounded-2xl transition-all duration-200">
-                    <span className="text-xs font-semibold text-slate-300">{docLabel}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-300">{docLabel}</span>
+                      <span className="text-[10px] text-slate-500">Max 5MB</span>
+                    </div>
                     
                     <div className="relative flex-1 flex flex-col items-center justify-center py-6 cursor-pointer">
                       {uploadingDoc === docLabel ? (
@@ -410,6 +468,11 @@ const BuilderProfilePage = () => {
                         disabled={uploadingDoc !== null || saving}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {uploadedDocs.filter((doc) => doc.name.startsWith(docLabel)).map((doc) => (
+                        <div key={doc.url} className="truncate">• {doc.name.split('_').slice(1).join('_')}</div>
+                      ))}
                     </div>
                   </div>
                 );

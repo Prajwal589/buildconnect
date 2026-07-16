@@ -1,4 +1,5 @@
 import { query } from '../config/db';
+import { StorageService } from '../storage/supabaseStorage';
 
 export interface ProjectData {
   name: string;
@@ -20,6 +21,14 @@ export interface PackageData {
   scope: string;
   required_experience?: string;
   skills?: string[]; // Array of skill UUIDs or names
+  selected_services?: string[];
+  custom_services?: string;
+}
+
+export interface ProjectImageUpload {
+  name: string;
+  fileType: string;
+  fileData: string;
 }
 
 export class ProjectRepository {
@@ -27,7 +36,8 @@ export class ProjectRepository {
   static async createProject(
     builderId: string,
     project: ProjectData,
-    packages: PackageData[]
+    packages: PackageData[],
+    siteImages?: ProjectImageUpload[]
   ): Promise<any> {
     await query('BEGIN');
     try {
@@ -84,11 +94,33 @@ export class ProjectRepository {
         insertedPackages.push({ ...newPkg, skills: pkg.skills || [] });
       }
 
+      if (siteImages && siteImages.length > 0) {
+        await this.addProjectDocuments(newProject.id, siteImages);
+      }
+
       await query('COMMIT');
       return { ...newProject, packages: insertedPackages };
     } catch (error) {
       await query('ROLLBACK');
       throw error;
+    }
+  }
+
+  // Persist project images into storage and documents table
+  static async addProjectDocuments(projectId: string, siteImages: ProjectImageUpload[]): Promise<void> {
+    for (const image of siteImages) {
+      let base64String = image.fileData;
+      if (base64String.includes('base64,')) {
+        base64String = base64String.split('base64,')[1];
+      }
+      const buffer = Buffer.from(base64String, 'base64');
+      const url = await StorageService.uploadFile(buffer, image.name, 'project-images');
+
+      await query(
+        `INSERT INTO documents (entity_type, entity_id, file_name, file_url, file_type)
+         VALUES ($1, $2, $3, $4, $5)`,
+        ['project', projectId, image.name, url, image.fileType]
+      );
     }
   }
 
@@ -104,6 +136,21 @@ export class ProjectRepository {
        GROUP BY p.id
        ORDER BY p.created_at DESC`,
       [builderId]
+    );
+    return result.rows;
+  }
+
+  // Get projects waiting for admin approval
+  static async getPendingApprovalProjects(): Promise<any[]> {
+    const result = await query(
+      `SELECT p.*, b.company_name as builder_name, b.trust_score as builder_trust_score,
+              COUNT(pp.id) as package_count
+       FROM projects p
+       JOIN builders b ON p.builder_id = b.id
+       LEFT JOIN project_packages pp ON p.id = pp.project_id
+       WHERE p.status = 'pending_approval'
+       GROUP BY p.id, b.company_name, b.trust_score
+       ORDER BY p.created_at ASC`
     );
     return result.rows;
   }
@@ -135,6 +182,15 @@ export class ProjectRepository {
     );
 
     project.packages = packagesRes.rows;
+
+    const docsRes = await query(
+      `SELECT file_name, file_url, file_type
+       FROM documents
+       WHERE entity_type = 'project' AND entity_id = $1`,
+      [projectId]
+    );
+    project.documents = docsRes.rows;
+
     return project;
   }
 

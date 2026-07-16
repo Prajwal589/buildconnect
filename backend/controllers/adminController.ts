@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
 import { AdminRepository } from '../repositories/adminRepository';
+import { ProjectRepository } from '../repositories/projectRepository';
 import { createApiResponse } from '../utils/apiResponse';
 import { reviewVerificationSchema, suspendUserSchema } from '../validators/adminValidator';
 
@@ -51,6 +52,37 @@ export class AdminController {
     try {
       const reviews = await AdminRepository.getAllReviews();
       res.status(200).json(createApiResponse(true, 'Reviews retrieved successfully.', reviews));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get pending project approvals
+  static async getPendingProjects(_req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const pendingProjects = await ProjectRepository.getPendingApprovalProjects();
+      res.status(200).json(createApiResponse(true, 'Pending projects retrieved successfully.', pendingProjects));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Approve or reject a project submission
+  static async reviewProjectApproval(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const projectId = req.params.id;
+      const { action } = req.body;
+      if (!action || !['approve', 'reject'].includes(action)) {
+        res.status(400).json(createApiResponse(false, "Action must be either 'approve' or 'reject'."));
+        return;
+      }
+
+      const targetStatus = action === 'approve' ? 'published' : 'draft';
+      const updatedProject = await ProjectRepository.updateProjectStatus(projectId, targetStatus as any);
+
+      res.status(200).json(
+        createApiResponse(true, `Project has been ${action === 'approve' ? 'approved and published' : 'rejected and returned to draft'}.`, updatedProject)
+      );
     } catch (error) {
       next(error);
     }

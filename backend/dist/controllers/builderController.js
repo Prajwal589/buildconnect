@@ -130,12 +130,17 @@ class BuilderController {
             }
             const validatedData = builderValidator_1.uploadFileSchema.parse(req.body);
             const { fileName, fileType, fileData } = validatedData;
+            const MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024;
             // Extract base64 file buffer (handle data URL prefix if present)
             let base64String = fileData;
             if (fileData.includes('base64,')) {
                 base64String = fileData.split('base64,')[1];
             }
             const fileBuffer = Buffer.from(base64String, 'base64');
+            if (fileBuffer.length > MAX_DOCUMENT_SIZE_BYTES) {
+                res.status(413).json((0, apiResponse_1.createApiResponse)(false, 'File exceeds the 5 MB limit per document.'));
+                return;
+            }
             // Upload to storage
             const fileUrl = await supabaseStorage_1.StorageService.uploadFile(fileBuffer, fileName, 'builder-docs');
             res.status(200).json((0, apiResponse_1.createApiResponse)(true, 'File uploaded successfully.', {

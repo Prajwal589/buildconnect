@@ -28,7 +28,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: true, limit: '8mb' }));
 
 // Serve local upload assets statically for testing fallbacks
 app.use('/storage/uploads', express.static(path.join(__dirname, 'storage/uploads')));

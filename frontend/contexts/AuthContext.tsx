@@ -112,6 +112,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('builderInactivityTimestamp');
+      localStorage.removeItem('builderRedirectAfterLogin');
       setUser(null);
     } finally {
       setLoading(false);
